@@ -130,19 +130,25 @@ class BacktrackingLineSearch(LineSearch):
 class InverseKinematics:
     """Jacobian follower based inverse kinematics solver"""
 
-    def __init__(self, serial_chain: SerialChain,
-                 pos_tolerance: float = 1e-3, rot_tolerance: float = 1e-2,
-                 retry_configs: Optional[torch.Tensor] = None, num_retries: Optional[int] = None,
-                 joint_limits: Optional[torch.Tensor] = None,
-                 config_sampling_method: Union[str, Callable[[int], torch.Tensor]] = "uniform",
-                 max_iterations: int = 50,
-                 lr: float = 0.2, line_search: Optional[LineSearch] = None,
-                 regularlization: float = 1e-9,
-                 debug=False,
-                 early_stopping_any_converged=False,
-                 early_stopping_no_improvement="any", early_stopping_no_improvement_patience=2,
-                 optimizer_method: Union[str, typing.Type[torch.optim.Optimizer]] = "sgd"
-                 ):
+    def __init__(
+        self,
+        serial_chain: SerialChain,
+        pos_tolerance: float = 1e-3,
+        rot_tolerance: float = 1e-2,
+        retry_configs: Optional[torch.Tensor] = None,
+        num_retries: Optional[int] = None,
+        joint_limits: Optional[torch.Tensor] = None,
+        config_sampling_method: Union[str, Callable[[int], torch.Tensor]] = "uniform",
+        max_iterations: int = 50,
+        lr: float = 0.2,
+        line_search: Optional[LineSearch] = None,
+        regularlization: float = 1e-9,
+        debug=False,
+        early_stopping_any_converged=False,
+        early_stopping_no_improvement="any",
+        early_stopping_no_improvement_patience=2,
+        optimizer_method: Union[str, typing.Type[torch.optim.Optimizer]] = "sgd",
+    ):
         """
         :param serial_chain:
         :param pos_tolerance: position tolerance in meters
@@ -216,8 +222,11 @@ class InverseKinematics:
             # bound by joint_limits
             if self.joint_limits is None:
                 raise ValueError("joint_limits must be specified if config_sampling_method is uniform")
-            return torch.rand(num_configs, self.dof, device=self.device) * (
-                    self.joint_limits[:, 1] - self.joint_limits[:, 0]) + self.joint_limits[:, 0]
+            return (
+                torch.rand(num_configs, self.dof, device=self.device)
+                * (self.joint_limits[:, 1] - self.joint_limits[:, 0])
+                + self.joint_limits[:, 0]
+            )
         elif self.config_sampling_method == "gaussian":
             return torch.randn(num_configs, self.dof, device=self.device)
         elif callable(self.config_sampling_method):
@@ -225,7 +234,7 @@ class InverseKinematics:
         else:
             raise ValueError("invalid config_sampling_method %s" % self.config_sampling_method)
 
-    def solve(self, target_poses: Transform3d) -> IKSolution:
+    def solve(self, target_poses: Transform3d, ref_configs: Optional[torch.tensor] = None) -> IKSolution:
         """
         Solve IK for the given target poses in robot frame
         :param target_poses: (N, 4, 4) tensor, goal pose in robot frame
@@ -249,8 +258,9 @@ def delta_pose(m: torch.tensor, target_pos, target_wxyz):
 
     # quaternion that rotates from the current orientation to the desired orientation
     # inverse for unit quaternion is the conjugate
-    diff_wxyz = rotation_conversions.quaternion_multiply(target_wxyz.unsqueeze(1),
-                                                         rotation_conversions.quaternion_invert(cur_wxyz))
+    diff_wxyz = rotation_conversions.quaternion_multiply(
+        target_wxyz.unsqueeze(1), rotation_conversions.quaternion_invert(cur_wxyz)
+    )
     # angular velocity vector needed to correct the orientation
     # if time is considered, should divide by \delta t, but doing it iteratively we can choose delta t to be 1
     diff_axis_angle = rotation_conversions.quaternion_to_axis_angle(diff_wxyz)
@@ -279,7 +289,7 @@ class PseudoInverseIK(InverseKinematics):
         dq = J.transpose(1, 2) @ A
         return dq
 
-    def solve(self, target_poses: Transform3d) -> IKSolution:
+    def solve(self, target_poses: Transform3d, ref_configs: Optional[torch.tensor] = None) -> IKSolution:
         self.clear()
 
         target = target_poses.get_matrix()
@@ -293,7 +303,10 @@ class PseudoInverseIK(InverseKinematics):
 
         sol = IKSolution(self.dof, M, self.num_retries, self.pos_tolerance, self.rot_tolerance, device=self.device)
 
-        q = self.initial_config
+        if ref_configs is not None:
+            q = ref_configs
+        else:
+            q = self.initial_config
         if q.numel() == M * self.dof * self.num_retries:
             q = q.reshape(-1, self.dof)
         elif q.numel() == self.dof * self.num_retries:
@@ -303,7 +316,8 @@ class PseudoInverseIK(InverseKinematics):
             q = q.unsqueeze(0).repeat(M * self.num_retries, 1)
         else:
             raise ValueError(
-                f"initial_config must have shape ({M}, {self.num_retries}, {self.dof}) or ({self.num_retries}, {self.dof})")
+                f"ref_configs must have shape ({M}, {self.num_retries}, {self.dof}) or ({self.num_retries}, {self.dof})"
+            )
         # for logging, let's keep track of the joint angles at each iteration
         if self.debug:
             pos_errors = []
@@ -339,8 +353,9 @@ class PseudoInverseIK(InverseKinematics):
             else:
                 with torch.no_grad():
                     if self.line_search is not None:
-                        lr, improvement = self.line_search.do_line_search(self.chain, q, dq, target_pos, target_wxyz,
-                                                                          dx, problem_remaining=sol.remaining)
+                        lr, improvement = self.line_search.do_line_search(
+                            self.chain, q, dq, target_pos, target_wxyz, dx, problem_remaining=sol.remaining
+                        )
                         lr = lr.unsqueeze(1)
                     else:
                         lr = self.lr
@@ -386,7 +401,7 @@ class PseudoInverseIK(InverseKinematics):
             fig, ax = plt.subplots(ncols=2, figsize=(10, 5))
             pos_e = torch.stack(pos_errors, dim=0).cpu()
             rot_e = torch.stack(rot_errors, dim=0).cpu()
-            ax[0].set_ylim(0, 1.)
+            ax[0].set_ylim(0, 1.0)
             # ignore nan
             ignore = torch.isnan(rot_e)
             axis_max = rot_e[~ignore].max().item()
@@ -420,7 +435,7 @@ class PseudoInverseIKWithSVD(PseudoInverseIK):
         # tmpA = U @ (D @ D.transpose(1, 2) + reg) @ U.transpose(1, 2)
         # singular_val = torch.diagonal(D)
 
-        denom = D ** 2 + self.regularlization
+        denom = D**2 + self.regularlization
         prod = D / denom
         # J^T (JJ^T + lambda^2I)^-1 = V @ (D @ D^T + lambda^2I)^-1 @ U^T = sum_i (d_i / (d_i^2 + lambda^2) v_i @ u_i^T)
         # should be equivalent to damped least squares
