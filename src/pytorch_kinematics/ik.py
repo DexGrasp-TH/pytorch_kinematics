@@ -361,6 +361,14 @@ class PseudoInverseIK(InverseKinematics):
                         lr = self.lr
                     q = q + lr * dq
 
+            # added by mingrui
+            # clamp the q into the joint limits in each iteration step
+            q = torch.clamp(
+                q,
+                min=self.joint_limits[:, 0].unsqueeze(0),
+                max=self.joint_limits[:, 1].unsqueeze(0),
+            )
+
             with torch.no_grad():
                 self.err_all = dx.squeeze()
                 self.err = self.err_all.norm(dim=-1)
