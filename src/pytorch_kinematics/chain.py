@@ -107,7 +107,7 @@ class Chain:
             else:
                 self.parents_indices.append(self.parents_indices[parent_idx] + [idx])
 
-            is_fixed = root.joint.joint_type == 'fixed'
+            is_fixed = root.joint.joint_type == "fixed"
 
             if root.link.offset is None:
                 self.link_offsets.append(None)
@@ -152,8 +152,9 @@ class Chain:
         self.joint_indices = self.joint_indices.to(dtype=torch.long, device=self.device)
         self.axes = self.axes.to(dtype=self.dtype, device=self.device)
         self.link_offsets = [l if l is None else l.to(dtype=self.dtype, device=self.device) for l in self.link_offsets]
-        self.joint_offsets = [j if j is None else j.to(dtype=self.dtype, device=self.device) for j in
-                              self.joint_offsets]
+        self.joint_offsets = [
+            j if j is None else j.to(dtype=self.dtype, device=self.device) for j in self.joint_offsets
+        ]
         self.low = self.low.to(dtype=self.dtype, device=self.device)
         self.high = self.high.to(dtype=self.dtype, device=self.device)
 
@@ -168,7 +169,7 @@ class Chain:
             if child.name == name:
                 return child
             ret = Chain._find_frame_recursive(name, child)
-            if not ret is None:
+            if ret is not None:
                 return ret
         return None
 
@@ -183,7 +184,7 @@ class Chain:
             if child.link.name == name:
                 return child.link
             ret = Chain._find_link_recursive(name, child)
-            if not ret is None:
+            if ret is not None:
                 return ret
         return None
 
@@ -204,7 +205,7 @@ class Chain:
     def get_joint_parameter_names(self, exclude_fixed=True):
         names = []
         for j in self.get_joints(exclude_fixed=exclude_fixed):
-            if exclude_fixed and j.joint_type == 'fixed':
+            if exclude_fixed and j.joint_type == "fixed":
                 continue
             names.append(j.name)
         return names
@@ -215,7 +216,7 @@ class Chain:
             if child.joint.name == name:
                 return child.joint
             ret = Chain._find_joint_recursive(name, child)
-            if not ret is None:
+            if ret is not None:
                 return ret
         return None
 
@@ -346,8 +347,10 @@ class Chain:
 
             frame_transforms[frame_idx.item()] = frame_transform
 
-        frame_names_and_transform3ds = {self.idx_to_frame[frame_idx]: tf.Transform3d(matrix=transform) for
-                                        frame_idx, transform in frame_transforms.items()}
+        frame_names_and_transform3ds = {
+            self.idx_to_frame[frame_idx]: tf.Transform3d(matrix=transform)
+            for frame_idx, transform in frame_transforms.items()
+        }
 
         return frame_names_and_transform3ds
 
@@ -426,7 +429,7 @@ class Chain:
             recursive_child_links = yield from Chain._get_joints_and_child_links(child)
             me_and_my_children.extend(recursive_child_links)
 
-        if joint is not None and joint.joint_type != 'fixed':
+        if joint is not None and joint.joint_type != "fixed":
             yield joint, me_and_my_children
 
         return me_and_my_children
@@ -468,11 +471,11 @@ class SerialChain(Chain):
 
     def jacobian(self, th, locations=None, **kwargs):
         if locations is not None:
-            locations = tf.Transform3d(pos=locations)
+            locations = tf.Transform3d(pos=locations, device=th.device)
         return jacobian.calc_jacobian(self, th, tool=locations, **kwargs)
 
     def forward_kinematics(self, th, end_only: bool = True):
-        """ Like the base class, except `th` only needs to contain the joints in the SerialChain, not all joints. """
+        """Like the base class, except `th` only needs to contain the joints in the SerialChain, not all joints."""
         frame_indices, th = self.convert_serial_inputs_to_chain_inputs(th, end_only)
 
         mat = super().forward_kinematics(th, frame_indices)
@@ -498,9 +501,9 @@ class SerialChain(Chain):
         if th_n_joints < self.n_joints:
             # if th is only a partial list of joints, assume it's a list of joints for only the serial chain.
             partial_th = th
-            nonfixed_serial_frames = list(filter(lambda f: f.joint.joint_type != 'fixed', self._serial_frames))
+            nonfixed_serial_frames = list(filter(lambda f: f.joint.joint_type != "fixed", self._serial_frames))
             if th_n_joints != len(nonfixed_serial_frames):
-                raise ValueError(f'Expected {len(nonfixed_serial_frames)} joint values, got {th_n_joints}.')
+                raise ValueError(f"Expected {len(nonfixed_serial_frames)} joint values, got {th_n_joints}.")
             th = torch.zeros([th_b, self.n_joints], device=self.device, dtype=self.dtype)
             for i, frame in enumerate(nonfixed_serial_frames):
                 joint_name = frame.joint.name
@@ -510,6 +513,6 @@ class SerialChain(Chain):
                     partial_th_i = partial_th[..., i]
                 k = self.frame_to_idx[frame.name]
                 jnt_idx = self.joint_indices[k]
-                if frame.joint.joint_type != 'fixed':
+                if frame.joint.joint_type != "fixed":
                     th[..., jnt_idx] = partial_th_i
         return frame_indices, th
