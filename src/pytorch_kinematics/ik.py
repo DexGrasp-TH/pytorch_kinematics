@@ -311,7 +311,7 @@ class PseudoInverseIK(InverseKinematics):
             q = q.reshape(-1, self.dof)
         elif q.numel() == self.dof * self.num_retries:
             # repeat and manually flatten it
-            q = self.initial_config.repeat(M, 1)
+            q = q.repeat(M, 1)
         elif q.numel() == self.dof:
             q = q.unsqueeze(0).repeat(M * self.num_retries, 1)
         else:
