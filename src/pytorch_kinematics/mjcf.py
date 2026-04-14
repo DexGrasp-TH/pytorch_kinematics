@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 from typing import Union
 import os
+=======
+from typing import Union, Optional, Dict
+
+>>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
 import mujoco
 from mujoco._structs import _MjModelBodyViews as MjModelBodyViews
 
@@ -65,7 +70,7 @@ def _build_chain_recurse(m, parent_frame, parent_body):
             ]
 
 
-def build_chain_from_mjcf(data, body: Union[None, str, int] = None):
+def build_chain_from_mjcf(data, body: Union[None, str, int] = None, assets:Optional[Dict[str,bytes]]=None):
     """
     Build a Chain object from MJCF data.
 
@@ -81,11 +86,15 @@ def build_chain_from_mjcf(data, body: Union[None, str, int] = None):
     chain.Chain
         Chain object created from MJCF.
     """
+<<<<<<< HEAD
     if data.endswith(".xml"):
         m = mujoco.MjModel.from_xml_path(data)
     else:
         m = mujoco.MjModel.from_xml_string(data)
 
+=======
+    m = mujoco.MjModel.from_xml_string(data, assets=assets)
+>>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
     if body is None:
         root_body = m.body(0)
     else:

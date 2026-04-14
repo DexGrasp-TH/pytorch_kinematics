@@ -13,3 +13,4 @@ tests/MUJOCO_LOG.TXT
 tests/mujoco_menagerie/
 .ipynb_checkpoints
 .codex
+CLAUDE.md

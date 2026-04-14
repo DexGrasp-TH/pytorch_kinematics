@@ -51,7 +51,7 @@ class Transform3d:
 
     .. code-block:: python
 
-        y1 = t3.transform_points(t2.transform_points(t1.transform_points(x)))
+        y1 = t1.transform_points(t2.transform_points(t3.transform_points(x)))
         y2 = t1.compose(t2).compose(t3).transform_points(x)
         y3 = t1.compose(t2, t3).transform_points(x)
 
@@ -319,7 +319,7 @@ class Transform3d:
             points_out: points of shape (N, P, 3) or (P, 3) depending
             on the dimensions of the transform
         """
-        points_batch = points.clone()
+        points_batch = points
         if points_batch.dim() == 2:
             points_batch = points_batch[None]  # (P, 3) -> (1, P, 3)
         if points_batch.dim() != 3:
@@ -746,6 +746,8 @@ def _broadcast_bmm(a, b):
             a = a.expand(len(b), -1, -1)
         if len(b) == 1:
             b = b.expand(len(a), -1, -1)
+    if a.dtype != b.dtype:
+        b = b.to(dtype=a.dtype)
     return a.bmm(b)
 
 
@@ -764,6 +766,8 @@ def _check_valid_rotation_matrix(R, tol: float = 1e-7):
 
     Emits a warning if R is an invalid rotation matrix.
     """
+    if torch.compiler.is_compiling():
+        return
     N = R.shape[0]
     eye = torch.eye(3, dtype=R.dtype, device=R.device)
     eye = eye.view(1, 3, 3).expand(N, -1, -1)
