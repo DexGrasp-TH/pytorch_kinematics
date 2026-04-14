@@ -411,54 +411,8 @@ class Chain:
 
         all_transforms = self.forward_kinematics_tensor(th)
 
-<<<<<<< HEAD
-        # compute all joint transforms at once first
-        # in order to handle multiple joint types without branching, we create all possible transforms
-        # for all joint types and then select the appropriate one for each joint.
-        rev_jnt_transform = axis_and_angle_to_matrix_44(axes_expanded, th)
-        pris_jnt_transform = axis_and_d_to_pris_matrix(axes_expanded, th)
-
-        frame_transforms = {}
-        b = th.shape[0]
-        for frame_idx in frame_indices:
-            frame_transform = torch.eye(4).to(th).unsqueeze(0).repeat(b, 1, 1)
-
-            # iterate down the list and compose the transform
-            for chain_idx in self.parents_indices[frame_idx.item()]:
-                if chain_idx.item() in frame_transforms:
-                    frame_transform = frame_transforms[chain_idx.item()]
-                else:
-                    link_offset_i = self.link_offsets[chain_idx]
-                    if link_offset_i is not None:
-                        frame_transform = frame_transform @ link_offset_i
-
-                    joint_offset_i = self.joint_offsets[chain_idx]
-                    if joint_offset_i is not None:
-                        frame_transform = frame_transform @ joint_offset_i
-
-                    jnt_idx = self.joint_indices[chain_idx]
-                    jnt_type = self.joint_type_indices[chain_idx]
-                    if jnt_type == 0:
-                        pass
-                    elif jnt_type == 1:
-                        jnt_transform_i = rev_jnt_transform[:, jnt_idx]
-                        frame_transform = frame_transform @ jnt_transform_i
-                    elif jnt_type == 2:
-                        jnt_transform_i = pris_jnt_transform[:, jnt_idx]
-                        frame_transform = frame_transform @ jnt_transform_i
-
-            frame_transforms[frame_idx.item()] = frame_transform
-
-        frame_names_and_transform3ds = {
-            self.idx_to_frame[frame_idx]: tf.Transform3d(matrix=transform)
-            for frame_idx, transform in frame_transforms.items()
-        }
-
-        return frame_names_and_transform3ds
-=======
         return {self.idx_to_frame[fi.item()]: tf.Transform3d(matrix=all_transforms[fi])
                 for fi in frame_indices}
->>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
 
     def ensure_tensor(self, th):
         """
@@ -675,10 +629,6 @@ class SerialChain(Chain):
             return self.jacobian_tensor(th)
 
         if locations is not None:
-<<<<<<< HEAD
-            locations = tf.Transform3d(pos=locations, device=th.device)
-        return jacobian.calc_jacobian(self, th, tool=locations, **kwargs)
-=======
             # Compute FK once and pass to jacobian_tensor to avoid redundant FK
             all_transforms = self.forward_kinematics_tensor(th)
             J = self.jacobian_tensor(th, all_transforms=all_transforms)
@@ -716,7 +666,6 @@ class SerialChain(Chain):
         # ret_eef_pose=True, no locations: get both from single FK pass
         J, T_ee = self.jacobian_tensor(th, ret_eef_pose=True)
         return J, T_ee
->>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
 
     def forward_kinematics(self, th, end_only: bool = True):
         """Like the base class, except `th` only needs to contain the joints in the SerialChain, not all joints."""

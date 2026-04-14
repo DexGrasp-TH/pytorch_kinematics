@@ -263,27 +263,6 @@ class BacktrackingLineSearch(LineSearch):
 class InverseKinematics:
     """Jacobian follower based inverse kinematics solver"""
 
-<<<<<<< HEAD
-    def __init__(
-        self,
-        serial_chain: SerialChain,
-        pos_tolerance: float = 1e-3,
-        rot_tolerance: float = 1e-2,
-        retry_configs: Optional[torch.Tensor] = None,
-        num_retries: Optional[int] = None,
-        joint_limits: Optional[torch.Tensor] = None,
-        config_sampling_method: Union[str, Callable[[int], torch.Tensor]] = "uniform",
-        max_iterations: int = 50,
-        lr: float = 0.2,
-        line_search: Optional[LineSearch] = None,
-        regularlization: float = 1e-9,
-        debug=False,
-        early_stopping_any_converged=False,
-        early_stopping_no_improvement="any",
-        early_stopping_no_improvement_patience=2,
-        optimizer_method: Union[str, typing.Type[torch.optim.Optimizer]] = "sgd",
-    ):
-=======
     def __init__(self, serial_chain: SerialChain,
                  pos_tolerance: float = 1e-3, rot_tolerance: float = 1e-2,
                  retry_configs: Optional[torch.Tensor] = None, num_retries: Optional[int] = None,
@@ -300,7 +279,6 @@ class InverseKinematics:
                  num_limit_refinement_iterations: int = 10,
                  clamp_to_limits: bool = False
                  ):
->>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
         """
         :param serial_chain:
         :param pos_tolerance: position tolerance in meters
@@ -529,39 +507,9 @@ class PseudoInverseIK(InverseKinematics):
                                           self._reg_matrix, self.num_retries, self.lm_damping, self._task_weight)
                 dq = dq.squeeze(2)
 
-<<<<<<< HEAD
-            improvement = None
-            if optimizer is not None:
-                q.grad = -dq
-                optimizer.step()
-                optimizer.zero_grad()
-            else:
-                with torch.no_grad():
-                    if self.line_search is not None:
-                        lr, improvement = self.line_search.do_line_search(
-                            self.chain, q, dq, target_pos, target_wxyz, dx, problem_remaining=sol.remaining
-                        )
-                        lr = lr.unsqueeze(1)
-                    else:
-                        lr = self.lr
-                    q = q + lr * dq
-
-            # added by mingrui
-            # clamp the q into the joint limits in each iteration step
-            q = torch.clamp(
-                q,
-                min=self.joint_limits[:, 0].unsqueeze(0),
-                max=self.joint_limits[:, 1].unsqueeze(0),
-            )
-
-            with torch.no_grad():
-                self.err_all = dx.squeeze()
-                self.err = self.err_all.norm(dim=-1)
-=======
                 # convergence check using error at current q (before stepping)
                 self.err_all = dx.squeeze(2)
                 self.err = self.err_all.reshape(-1, self.num_retries, 6).norm(dim=-1)
->>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
                 sol.update(q, self.err_all, use_keep_mask=self.early_stopping_any_converged)
 
                 if self.early_stopping_no_improvement is not None:
@@ -711,21 +659,6 @@ class PseudoInverseIKWithSVD(PseudoInverseIK):
     damping if subclassed further.
     """
 
-<<<<<<< HEAD
-        denom = D**2 + self.regularlization
-        prod = D / denom
-        # J^T (JJ^T + lambda^2I)^-1 = V @ (D @ D^T + lambda^2I)^-1 @ U^T = sum_i (d_i / (d_i^2 + lambda^2) v_i @ u_i^T)
-        # should be equivalent to damped least squares
-        inverted = torch.diag_embed(prod)
-
-        # drop columns from V
-        Vh = Vh[:, :m, :]
-        total = Vh.transpose(1, 2) @ inverted @ U.transpose(1, 2)
-
-        # dq = J^T (JJ^T + lambda^2I)^-1 dx
-        dq = total @ dx
-        return dq
-=======
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Override the step kernel with the SVD variant
@@ -733,4 +666,3 @@ class PseudoInverseIKWithSVD(PseudoInverseIK):
             self._ik_step_fn = torch.compile(_ik_step_kernel_svd)
         else:
             self._ik_step_fn = _ik_step_kernel_svd
->>>>>>> 01d10027c0df76592516d7fe909199644332ad6d
